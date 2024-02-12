@@ -32,9 +32,9 @@ user_state = STATE_NONE
 def start(message):
     global user_state, context
     bot.reply_to(message, """Hello there! I'm AcadBot, your personal academic assistant. I can help you with various tasks, including:
-Answering your questions on diverse academic topics.
-Searching for relevant study materials, articles, and other resources.
-Answering your questions directly within uploaded PDF documents.
+⁕ Answering your questions on diverse academic topics.
+⁕ Searching for relevant study materials, articles, and other resources.
+⁕ Answering your questions directly within uploaded PDF documents.
 **Just ask me anything! ** You can chat with me like you would a friend, or use specific commands for certain functionalities. 
 For more info, click here "/help".""")
     user_state = STATE_WAITING_FOR_START
@@ -46,10 +46,10 @@ For more info, click here "/help".""")
 def help(message):
     global user_state
     bot.reply_to(message, """Hey! Looking for some guidance? Here's how you can use me:
-Chat & Ask Questions: Type your queries as you normally would, and I'll do my best to provide helpful answers.
-Find Resources: Need articles, books, or other materials? Use the command "/resource your_query" (e.g., "/resource chemistry textbook").
-Ask Questions about PDFs: Upload a PDF and ask your questions directly within the document. Just send the file and then your questions.
-I'm still under development, but I'm learning every day! Feel free to ask anything, and if I can't answer, I'll let you know""")
+⁕ Chat & Ask Questions: Type your queries as you normally would, and I'll do my best to provide helpful answers.
+⁕ Find Resources: Need articles, books, or other materials? Use the command "/resource".
+⁕ Ask Questions about PDFs: Upload a PDF and ask your questions directly within the document. Just send the file and wait for the bots message to ask questions. Use the command "/pdf_qna"
+⁕ I'm still under development, but I'm learning every day! Feel free to ask anything, and if I can't answer, I'll let you know""")
     user_state = STATE_WAITING_FOR_HELP
 
 # Resource command
