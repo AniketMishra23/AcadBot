@@ -37,12 +37,6 @@ def doc_qna(bot_token, file_id, filename, api_key):
     response = requests.post(
         'https://api.chatpdf.com/v1/sources/add-file', headers=headers, files=files)
 
-    # if response.status_code == 200:
-    #     print('Source ID:', response.json()['sourceId'])
-    # else:
-    #     print('Status:', response.status_code)
-    #     print('Error:', response.text)
-
     return response.json()['sourceId']
 
 
@@ -65,21 +59,4 @@ def chatpdf_chat(api_key, questions, sourceID):
     response = requests.post(
         'https://api.chatpdf.com/v1/chats/message', headers=headers, json=data)
 
-    # if response.status_code == 200:
-    #     print('Result:', response.json()['content'])
-    # else:
-    #     print('Status:', response.status_code)
-    #     print('Error:', response.text)
     return response.json()['content']
-
-# bot_token = "6337444124:AAEE11olEl0wVmQWU4t0Q-kZXr27I2SV_Ms"
-# file_id = "BQACAgUAAxkBAAIEzGXCnnkfZXgTUstl28gv2jo1xCjsAAJCDwACr9sRVtTY6itRuST1NAQ"
-# file_name = "Github.pdf"
-# file_path = "Github.pdf"
-# questions = 'Purpose of this file'
-# sourceID = doc_qna(bot_token, file_id, file_name, api_key)
-# print(sourceID)
-# print(chatpdf_chat(api_key, questions, sourceID))
-
-# # questons = "What is the purpose of this file?"
-# # sourceId = "src_555OQHmMBx9HQiJPMZGa9"

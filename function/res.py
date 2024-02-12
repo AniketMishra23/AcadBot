@@ -7,6 +7,3 @@ def findlink(query):
             if query in line:
                 return line
     return "Sorry, I couldn't find any link for your query."
-
-# query = input("Enter your query: ")
-# print(findlink(query))

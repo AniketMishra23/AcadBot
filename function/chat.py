@@ -29,7 +29,3 @@ def chatmodel(prompt):
     message = completion.choices[0].message.content
     chatstr += f"{message}\n"
     return message
-
-
-# prompt = input("Enter your prompt: ")
-# print(chatmodel(prompt))
