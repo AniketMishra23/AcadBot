@@ -14,7 +14,7 @@ def chatmodel(prompt):
     openai.api_key = os.getenv("OPENAI_KEY")
 
     # Add user prompt to chatstr
-    chatstr += f"Aniket: {prompt}\nAcadBot: "
+    chatstr += f"User: {prompt}\nAcadBot: "
 
     # Create a chatbot using ChatCompletion.create() function
     completion = openai.chat.completions.create(
