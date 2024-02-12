@@ -1,7 +1,7 @@
 # Resource finder for user
 def findlink(query):
     # query = message.text
-    with open('function\output.txt', 'r') as file:
+    with open('function\pdflinks.txt', 'r') as file:
         lines = file.readlines()
         for line in lines:
             if query in line:

@@ -1,0 +1,106 @@
+/* Basic styling for readability and responsive layout */
+body {
+  font-family: sans-serif;
+  margin: 0;
+  padding: 20px;
+  color: #333; /* Adjust text color for better contrast */
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f0f0f0;
+  padding: 10px;
+}
+
+nav a {
+  text-decoration: none; /* Remove underlines from links */
+  color: #007bff; /* Blue for primary links */
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+nav a:hover {
+  color: #0056b3; /* Darker blue on hover */
+}
+
+h1,
+h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+p {
+  line-height: 1.5; /* Improve readability */
+  margin-bottom: 15px;
+}
+
+#introduction,
+#about-us,
+#contact-us,
+#our-classes,
+#testimonials,
+#instructors {
+  padding: 30px;
+  border-radius: 5px; /* Subtle rounded corners */
+  background-color: #f5f5f5; /* Light background for better contrast */
+}
+
+/* Basic media query for responsive layout (optional) */
+@media (max-width: 768px) {
+  header nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header nav a {
+    margin-bottom: 5px;
+  }
+
+  #introduction,
+  #resources {
+    max-width: 80%;
+    margin: 0 auto;
+  }
+}
+
+table,
+th,
+td {
+  border: 1px solid grey;
+}
+
+/* Style for table rows */
+tr {
+  background-color: #f2f2f2;
+}
+
+/* Style for table data/cells */
+td {
+  padding: 8px;
+}
+
+/* Add a hover effect for table rows */
+tr:hover {
+  background-color: #ddd;
+}
+
+.table-container,
+.table-container2 {
+  display: flex;
+  justify-content: center;
+}
+
+.sem1,
+.sem2,
+.sem3,
+.sem4,
+.sem5,
+.sem6,
+.sem7,
+.sem8 {
+  margin: auto;
+  padding: 20px;
+}
