@@ -31,7 +31,12 @@ user_state = STATE_NONE
 @bot.message_handler(commands=['start'])
 def start(message):
     global user_state, context
-    bot.reply_to(message, "Hello, I'm a bot!")
+    bot.reply_to(message, """Hello there! I'm AcadBot, your personal academic assistant. I can help you with various tasks, including:
+                            Answering your questions on diverse academic topics.
+                            Searching for relevant study materials, articles, and other resources.
+                            Answering your questions directly within uploaded PDF documents.
+                            **Just ask me anything! ** You can chat with me like you would a friend, or use specific commands for certain functionalities. 
+                            For more info, click here "/help".""")
     user_state = STATE_WAITING_FOR_START
 
 # Help command
@@ -40,9 +45,11 @@ def start(message):
 @bot.message_handler(commands=['help'])
 def help(message):
     global user_state
-    bot.reply_to(message, "I am a AcadBot created by Aniket Mishra."
-                 "You can use me to Chat, Web search and to find any resource pdf link."
-                 "I am still in development phase, so you may encounter some bugs.")
+    bot.reply_to(message, """Hey! Looking for some guidance? Here's how you can use me:
+                            Chat & Ask Questions: Type your queries as you normally would, and I'll do my best to provide helpful answers.
+                            Find Resources: Need articles, books, or other materials? Use the command "/resource your_query" (e.g., "/resource chemistry textbook").
+                            Ask Questions about PDFs: Upload a PDF and ask your questions directly within the document. Just send the file and then your questions.
+                        I'm still under development, but I'm learning every day! Feel free to ask anything, and if I can't answer, I'll let you know""")
     user_state = STATE_WAITING_FOR_HELP
 
 # Resource command
