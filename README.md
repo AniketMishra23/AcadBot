@@ -44,4 +44,5 @@ AcadBot is a Telegram bot designed to assist students with their academic needs.
 ## Additional Notes
 
 - AcadBot is still under development.
+- Hosted a simple classes website on <a href="https://randomclassess.netlify.app/"> Netlify </a>
 - Feel free to provide feedback or suggestions!
