@@ -1,31 +1,50 @@
 from dotenv import load_dotenv
 import os
 import openai
+import logging
 
-load_dotenv()  # take environment variables from .env.
+load_dotenv()
 
-# To store the chat history
-chatstr = ''
+logger = logging.getLogger(__name__)
+
+# Per-user chat history: { user_id: conversation_string }
+user_chat_histories = {}
+
+MAX_HISTORY_CHARS = 4000  # Trim history to avoid hitting token limits
 
 
-def chatmodel(prompt):
-    global chatstr  # To access the chatstr variable outside the function
-
+def chatmodel(user_id, prompt):
     openai.api_key = os.getenv("OPENAI_KEY")
 
-    # Add user prompt to chatstr
-    chatstr += f"User: {prompt}\nAcadBot: "
+    # Get or initialise this user's history
+    history = user_chat_histories.get(user_id, "")
 
-    # Create a chatbot using ChatCompletion.create() function
-    completion = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant.Your role is to help students with their academic queries."},
-            {"role": "user", "content": chatstr}
-        ]
-    )
+    history += f"User: {prompt}\nAcadBot: "
 
-    # Add bot response to chatstr
-    message = completion.choices[0].message.content
-    chatstr += f"{message}\n"
-    return message
+    # Trim oldest history if it's getting too long
+    if len(history) > MAX_HISTORY_CHARS:
+        history = history[-MAX_HISTORY_CHARS:]
+
+    try:
+        completion = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are AcadBot, a helpful academic assistant. "
+                        "Your role is to help students with their academic queries clearly and concisely."
+                    )
+                },
+                {"role": "user", "content": history}
+            ]
+        )
+
+        message = completion.choices[0].message.content
+        history += f"{message}\n"
+        user_chat_histories[user_id] = history
+        return message
+
+    except Exception as e:
+        logger.error(f"OpenAI API error for user {user_id}: {e}")
+        raise

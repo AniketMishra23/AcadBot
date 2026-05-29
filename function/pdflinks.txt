@@ -1,40 +1,5 @@
-https://randomclassess.netlify.app/1.pdf
-https://randomclassess.netlify.app/2.pdf
-https://randomclassess.netlify.app/3.pdf
-https://randomclassess.netlify.app/4.pdf
-https://randomclassess.netlify.app/5.pdf
-https://randomclassess.netlify.app/1.pdf
-https://randomclassess.netlify.app/2.pdf
-https://randomclassess.netlify.app/3.pdf
-https://randomclassess.netlify.app/4.pdf
-https://randomclassess.netlify.app/5.pdf
-https://randomclassess.netlify.app/1.pdf
-https://randomclassess.netlify.app/2.pdf
-https://randomclassess.netlify.app/3.pdf
-https://randomclassess.netlify.app/4.pdf
-https://randomclassess.netlify.app/5.pdf
-https://randomclassess.netlify.app/1.pdf
-https://randomclassess.netlify.app/2.pdf
-https://randomclassess.netlify.app/3.pdf
-https://randomclassess.netlify.app/4.pdf
-https://randomclassess.netlify.app/5.pdf
-https://randomclassess.netlify.app/1.pdf
-https://randomclassess.netlify.app/2.pdf
-https://randomclassess.netlify.app/3.pdf
-https://randomclassess.netlify.app/4.pdf
-https://randomclassess.netlify.app/5.pdf
-https://randomclassess.netlify.app/1.pdf
-https://randomclassess.netlify.app/2.pdf
-https://randomclassess.netlify.app/3.pdf
-https://randomclassess.netlify.app/4.pdf
-https://randomclassess.netlify.app/5.pdf
-https://randomclassess.netlify.app/1.pdf
-https://randomclassess.netlify.app/2.pdf
-https://randomclassess.netlify.app/3.pdf
-https://randomclassess.netlify.app/4.pdf
-https://randomclassess.netlify.app/5.pdf
-https://randomclassess.netlify.app/1.pdf
-https://randomclassess.netlify.app/2.pdf
-https://randomclassess.netlify.app/3.pdf
-https://randomclassess.netlify.app/4.pdf
-https://randomclassess.netlify.app/5.pdf
+mathematics https://randomclassess.netlify.app/1.pdf
+physics https://randomclassess.netlify.app/2.pdf
+chemistry https://randomclassess.netlify.app/3.pdf
+biology https://randomclassess.netlify.app/4.pdf
+computer science https://randomclassess.netlify.app/5.pdf

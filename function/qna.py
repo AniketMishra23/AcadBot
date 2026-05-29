@@ -1,62 +1,81 @@
 import requests
 import os
 import dotenv
+import logging
 
 dotenv.load_dotenv()
-api_key = os.getenv("CHATPDF_API")
+
+logger = logging.getLogger(__name__)
 
 
 def doc_qna(bot_token, file_id, filename, api_key):
-    # Construct the URL for getting file information
+    """
+    Downloads the file from Telegram, uploads it to ChatPDF, and returns
+    (source_id, local_file_path). The caller is responsible for deleting
+    the local file after use.
+    """
+    # Get the file path on Telegram's servers
     get_file_path = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}"
+    response = requests.get(get_file_path, timeout=15)
+    response.raise_for_status()
 
-    # Make a request to get file information
-    response = requests.get(get_file_path)
     data = response.json()
     file_path = data['result']['file_path']
-    # print(file_path)
-
     file_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
 
-    # Download the file from Telegram
-    file_response = requests.get(file_url)
-    with open(f'{filename}', "wb") as file:
-        file.write(file_response.content)
-    print(f'{filename}', "downloaded successfully from Telegram.")
+    # Download the file locally
+    file_response = requests.get(file_url, timeout=30)
+    file_response.raise_for_status()
 
-    path = f'{filename}'
-    # Call the ChatPDF API
-    files = [
-        ('file', ('file', open(f'{path}', 'rb'),
-         'application/octet-stream'))
-    ]
-    headers = {
-        'x-api-key': api_key
-    }
+    local_path = filename
+    with open(local_path, "wb") as f:
+        f.write(file_response.content)
+    logger.info(f"Downloaded file from Telegram: {local_path}")
 
-    response = requests.post(
-        'https://api.chatpdf.com/v1/sources/add-file', headers=headers, files=files)
+    # Upload to ChatPDF
+    with open(local_path, 'rb') as f:
+        files = [('file', ('file', f, 'application/octet-stream'))]
+        headers = {'x-api-key': api_key}
+        upload_response = requests.post(
+            'https://api.chatpdf.com/v1/sources/add-file',
+            headers=headers,
+            files=files,
+            timeout=30
+        )
 
-    return response.json()['sourceId']
+    upload_response.raise_for_status()
+    source_id = upload_response.json().get('sourceId')
+
+    if not source_id:
+        raise ValueError("ChatPDF did not return a sourceId.")
+
+    logger.info(f"ChatPDF sourceId obtained: {source_id}")
+    return source_id, local_path
 
 
-def chatpdf_chat(api_key, questions, sourceID):
+def chatpdf_chat(api_key, question, source_id):
+    """Send a question about a previously uploaded PDF and return the answer."""
     headers = {
         'x-api-key': api_key,
         "Content-Type": "application/json",
     }
-
     data = {
-        'sourceId': sourceID,
+        'sourceId': source_id,
         'messages': [
-            {
-                'role': "user",
-                'content': questions,
-            }
+            {'role': "user", 'content': question}
         ]
     }
 
     response = requests.post(
-        'https://api.chatpdf.com/v1/chats/message', headers=headers, json=data)
+        'https://api.chatpdf.com/v1/chats/message',
+        headers=headers,
+        json=data,
+        timeout=30
+    )
+    response.raise_for_status()
 
-    return response.json()['content']
+    content = response.json().get('content')
+    if not content:
+        raise ValueError("ChatPDF returned an empty response.")
+
+    return content
