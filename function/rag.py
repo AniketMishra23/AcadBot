@@ -1,35 +1,44 @@
 """
-RAG pipeline — local, free, no external API.
+RAG pipeline — hybrid cloud + local.
 
-University pages  ──embed──▶  FAISS on disk  (shared per university)
-User-uploaded PDF ──embed──▶  FAISS in RAM   (per user session, cleared on stop)
+University indexes  →  Qdrant Cloud   (persistent, shared per university)
+PDF session indexes →  in-memory FAISS (ephemeral, per user, cleared on 'stop')
 
-Embedding model : all-MiniLM-L6-v2  (~90 MB, downloaded once, then cached)
-Vector dim      : 384
+Env vars required
+-----------------
+QDRANT_URL      — e.g. https://xyz.us-east4-0.gcp.cloud.qdrant.io
+QDRANT_API_KEY  — from Qdrant Cloud console
+
+Embedding model : all-MiniLM-L6-v2  (~90 MB, downloaded once, cached)
+Vector dimension: 384
 """
 
 import os
-import pickle
+import uuid
 import logging
 
 import numpy as np
 import faiss
 import pdfplumber
 from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
+from qdrant_client import models as qm
 
 logger = logging.getLogger(__name__)
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
-VECTOR_DIR   = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'vector_stores')
-CHUNK_SIZE   = 500    # characters per chunk
-CHUNK_OVERLAP= 80
-TOP_K        = 5
-EMBED_DIM    = 384    # all-MiniLM-L6-v2
+UNI_COLLECTION = "university_chunks"   # single Qdrant collection, filtered by uni_id
+CHUNK_SIZE     = 500
+CHUNK_OVERLAP  = 80
+TOP_K          = 5
+EMBED_DIM      = 384
 
-# ─── Singleton embedding model (loaded once on first use) ─────────────────────
+# ─── Singletons ──────────────────────────────────────────────────────────────
 
-_model: SentenceTransformer | None = None
+_model:  SentenceTransformer | None = None
+_qdrant: QdrantClient        | None = None
+
 
 def _get_model() -> SentenceTransformer:
     global _model
@@ -40,63 +49,37 @@ def _get_model() -> SentenceTransformer:
     return _model
 
 
-# ─── VectorStore ─────────────────────────────────────────────────────────────
-
-class VectorStore:
-    """Thin wrapper around a FAISS flat index with metadata side-car."""
-
-    def __init__(self):
-        self.index  = faiss.IndexFlatL2(EMBED_DIM)
-        self.chunks: list[dict] = []   # parallel list to FAISS vectors
-
-    # ── write ──────────────────────────────────────────────────────────────
-
-    def add(self, texts: list[str], metas: list[dict] | None = None):
-        if not texts:
-            return
-        vecs = _get_model().encode(texts, show_progress_bar=False)
-        self.index.add(np.array(vecs, dtype="float32"))
-        for i, t in enumerate(texts):
-            self.chunks.append({"text": t, "meta": (metas[i] if metas else {})})
-
-    def save(self, directory: str):
-        os.makedirs(directory, exist_ok=True)
-        faiss.write_index(self.index, os.path.join(directory, "index.faiss"))
-        with open(os.path.join(directory, "chunks.pkl"), "wb") as f:
-            pickle.dump(self.chunks, f)
-
-    # ── read ───────────────────────────────────────────────────────────────
-
-    @classmethod
-    def load(cls, directory: str) -> "VectorStore":
-        store = cls()
-        idx_path    = os.path.join(directory, "index.faiss")
-        chunks_path = os.path.join(directory, "chunks.pkl")
-        if os.path.exists(idx_path) and os.path.exists(chunks_path):
-            store.index = faiss.read_index(idx_path)
-            with open(chunks_path, "rb") as f:
-                store.chunks = pickle.load(f)
-            logger.info(f"Loaded {store.index.ntotal} vectors from {directory}")
-        return store
-
-    # ── query ──────────────────────────────────────────────────────────────
-
-    def search(self, query: str, top_k: int = TOP_K) -> list[dict]:
-        if self.index.ntotal == 0:
-            return []
-        vec = _get_model().encode([query], show_progress_bar=False)
-        distances, indices = self.index.search(
-            np.array(vec, dtype="float32"),
-            min(top_k, self.index.ntotal)
+def _get_qdrant() -> QdrantClient:
+    global _qdrant
+    if _qdrant is None:
+        _qdrant = QdrantClient(
+            url=os.getenv("QDRANT_URL"),
+            api_key=os.getenv("QDRANT_API_KEY"),
         )
-        results = []
-        for dist, idx in zip(distances[0], indices[0]):
-            if idx != -1:
-                results.append({**self.chunks[idx], "score": float(dist)})
-        return results
+    return _qdrant
 
 
-# ─── Helpers ─────────────────────────────────────────────────────────────────
+# ─── Qdrant collection bootstrap ─────────────────────────────────────────────
+
+def _ensure_collection():
+    """Create the university_chunks collection if it doesn't exist yet."""
+    client = _get_qdrant()
+    existing = [c.name for c in client.get_collections().collections]
+    if UNI_COLLECTION not in existing:
+        client.create_collection(
+            collection_name=UNI_COLLECTION,
+            vectors_config=qm.VectorParams(size=EMBED_DIM, distance=qm.Distance.COSINE),
+        )
+        # Index the uni_id payload field for fast filtered queries
+        client.create_payload_index(
+            collection_name=UNI_COLLECTION,
+            field_name="uni_id",
+            field_schema=qm.PayloadSchemaType.INTEGER,
+        )
+        logger.info(f"Created Qdrant collection '{UNI_COLLECTION}'.")
+
+
+# ─── Shared helpers ───────────────────────────────────────────────────────────
 
 def _chunk(text: str) -> list[str]:
     text = text.strip()
@@ -104,107 +87,168 @@ def _chunk(text: str) -> list[str]:
     while start < len(text):
         chunks.append(text[start: start + CHUNK_SIZE])
         start += CHUNK_SIZE - CHUNK_OVERLAP
-    return chunks
+    return [c for c in chunks if c.strip()]
 
 
-def _format_context(results: list[dict]) -> str | None:
-    if not results:
+def _format_context(hits: list[dict]) -> str | None:
+    if not hits:
         return None
     parts = []
-    for r in results:
-        meta  = r.get("meta", {})
-        title = meta.get("title", "")
-        url   = meta.get("url", "")
-        page  = meta.get("page", "")
-        src   = meta.get("source", "")
+    for h in hits:
+        title = h.get("title", "")
+        url   = h.get("url", "")
+        page  = h.get("page", "")
+        src   = h.get("source", "")
+        text  = h.get("text", "")
         if url:
             header = f"[{title or url}]({url})"
         elif src:
             header = f"[Page {page} of {src}]"
         else:
             header = title or "Source"
-        parts.append(f"{header}\n{r['text']}")
+        parts.append(f"{header}\n{text}")
     return "\n\n---\n\n".join(parts)
 
 
-# ─── In-memory caches ────────────────────────────────────────────────────────
-
-_uni_stores:     dict[int, VectorStore] = {}   # uni_id  → VectorStore (persisted)
-_session_stores: dict[int, VectorStore] = {}   # user_id → VectorStore (in-RAM only)
-
-
-# ─── University index (persisted to disk) ─────────────────────────────────────
+# ─── University index (Qdrant Cloud) ─────────────────────────────────────────
 
 def index_university_pages(uni_id: int, pages: list[dict]) -> int:
     """
-    Build and save a FAISS index from a list of scraped pages.
-    Returns the total number of chunks indexed.
+    Embed scraped pages and upsert into Qdrant (replacing any previous vectors
+    for this university).  Returns the number of chunks indexed.
     """
-    store  = VectorStore()
-    texts, metas = [], []
+    _ensure_collection()
+    client = _get_qdrant()
 
+    # Remove stale vectors for this university before re-indexing
+    client.delete(
+        collection_name=UNI_COLLECTION,
+        points_selector=qm.FilterSelector(
+            filter=qm.Filter(
+                must=[qm.FieldCondition(key="uni_id", match=qm.MatchValue(value=uni_id))]
+            )
+        ),
+    )
+
+    texts, payloads = [], []
     for page in pages:
         content = (page.get("content") or "").strip()
         if not content:
             continue
         for chunk in _chunk(content):
             texts.append(chunk)
-            metas.append({
+            payloads.append({
+                "uni_id":    uni_id,
+                "text":      chunk,
                 "url":       page.get("url", ""),
                 "title":     page.get("title", ""),
                 "page_type": page.get("page_type", "general"),
             })
 
-    if texts:
-        store.add(texts, metas)
-        store.save(os.path.join(VECTOR_DIR, str(uni_id)))
-        _uni_stores[uni_id] = store
-        logger.info(f"University {uni_id}: indexed {len(texts)} chunks.")
+    if not texts:
+        return 0
 
+    embeddings = _get_model().encode(texts, show_progress_bar=False)
+
+    # Batch-upsert (Qdrant recommends ≤ 100 points per call)
+    batch_size = 100
+    for i in range(0, len(texts), batch_size):
+        client.upsert(
+            collection_name=UNI_COLLECTION,
+            points=[
+                qm.PointStruct(
+                    id=str(uuid.uuid4()),
+                    vector=embeddings[j].tolist(),
+                    payload=payloads[j],
+                )
+                for j in range(i, min(i + batch_size, len(texts)))
+            ],
+        )
+
+    logger.info(f"University {uni_id}: upserted {len(texts)} chunks to Qdrant.")
     return len(texts)
 
 
 def query_university(uni_id: int, question: str) -> str | None:
-    """Return a formatted context string from the university index, or None."""
-    if uni_id not in _uni_stores:
-        path = os.path.join(VECTOR_DIR, str(uni_id))
-        _uni_stores[uni_id] = VectorStore.load(path)
+    """Semantic search over the university's Qdrant index."""
+    try:
+        _ensure_collection()
+        client = _get_qdrant()
+        query_vec = _get_model().encode([question], show_progress_bar=False)[0].tolist()
 
-    results = _uni_stores[uni_id].search(question)
-    return _format_context(results)
+        results = client.search(
+            collection_name=UNI_COLLECTION,
+            query_vector=query_vec,
+            query_filter=qm.Filter(
+                must=[qm.FieldCondition(key="uni_id", match=qm.MatchValue(value=uni_id))]
+            ),
+            limit=TOP_K,
+            with_payload=True,
+        )
+
+        if not results:
+            return None
+
+        hits = [r.payload for r in results]
+        return _format_context(hits)
+
+    except Exception as e:
+        logger.warning(f"Qdrant query failed: {e}")
+        return None
 
 
-# ─── Session index (PDF uploads, in-memory only) ──────────────────────────────
+# ─── PDF session index (in-memory FAISS) ─────────────────────────────────────
+
+class _SessionStore:
+    """Lightweight in-memory vector store for a single user's PDF session."""
+
+    def __init__(self):
+        self.index  = faiss.IndexFlatL2(EMBED_DIM)
+        self.chunks: list[dict] = []
+
+    def add(self, texts: list[str], metas: list[dict]):
+        if not texts:
+            return
+        vecs = _get_model().encode(texts, show_progress_bar=False)
+        self.index.add(np.array(vecs, dtype="float32"))
+        for t, m in zip(texts, metas):
+            self.chunks.append({"text": t, **m})
+
+    def search(self, query: str) -> list[dict]:
+        if self.index.ntotal == 0:
+            return []
+        vec = _get_model().encode([query], show_progress_bar=False)
+        dists, idxs = self.index.search(
+            np.array(vec, dtype="float32"),
+            min(TOP_K, self.index.ntotal)
+        )
+        return [self.chunks[i] for i in idxs[0] if i != -1]
+
+
+_session_stores: dict[int, _SessionStore] = {}
+
 
 def index_pdf_for_session(user_id: int, pdf_path: str) -> int:
-    """
-    Extract text from a PDF, chunk and embed it into a per-user session store.
-    Returns total chunks indexed.
-    """
+    """Extract, chunk, and embed a PDF into the user's session store."""
     texts, metas = [], []
 
     with pdfplumber.open(pdf_path) as pdf:
         for page_num, page in enumerate(pdf.pages, start=1):
-            text = page.extract_text() or ""
-            for chunk in _chunk(text):
+            for chunk in _chunk(page.extract_text() or ""):
                 texts.append(chunk)
-                metas.append({
-                    "source": os.path.basename(pdf_path),
-                    "page":   page_num,
-                })
+                metas.append({"source": os.path.basename(pdf_path), "page": page_num})
 
     if not texts:
         raise ValueError("No extractable text found in the PDF.")
 
-    store = VectorStore()
+    store = _SessionStore()
     store.add(texts, metas)
     _session_stores[user_id] = store
-    logger.info(f"User {user_id}: indexed {len(texts)} PDF chunks.")
+    logger.info(f"User {user_id}: indexed {len(texts)} PDF chunks in memory.")
     return len(texts)
 
 
 def query_session(user_id: int, question: str) -> str | None:
-    """Return formatted context from the user's active PDF session, or None."""
     store = _session_stores.get(user_id)
     if not store:
         return None

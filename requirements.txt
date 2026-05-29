@@ -9,3 +9,5 @@ beautifulsoup4
 cryptography
 numpy
 requests
+psycopg2-binary
+qdrant-client

@@ -4,146 +4,29 @@ AcadBot is a Telegram bot that acts as a personal academic assistant for univers
 
 ---
 
+## For Students (Using the Bot)
+
+**No setup needed.** Just open Telegram and search for **@AcadBot** (or the deployed bot username).
+
+1. Send `/start`
+2. Send your university website URL when asked
+3. If your portal requires login, the bot will ask for your credentials (encrypted at rest)
+4. The bot crawls your university site (~1–2 min) and is ready
+
+That's it — no account, no app, no installation.
+
+---
+
 ## Features
 
 | Feature | Description |
 |---|---|
 | 💬 **AI Chat** | Groq (Llama 3.3 70B) as primary model, Google Gemini 2.0 Flash as automatic fallback |
 | 🏫 **University Scraper** | Crawls any university website (login-protected or public) and indexes all content |
-| 📄 **PDF Q&A** | Upload any PDF and chat with it — fully local, no external API |
+| 📄 **PDF Q&A** | Upload any PDF and chat with it — fully local, no external API cost |
 | 🔍 **Resource Search** | Semantic + keyword search over scraped university pages |
 | 🔒 **Secure Credentials** | University login credentials encrypted with Fernet before storage |
 | 🗄️ **Shared Index** | Multiple students from the same university share one scrape — efficient |
-
----
-
-## How It Works
-
-```
-Student (Telegram)
-       │
-       ▼
-   AcadBot
-   ┌──────────────────────────────────────────────┐
-   │                                              │
-   │  AI Chat ──────────► Groq (Llama 3.3 70B)   │
-   │                  └──► Gemini 2.0 Flash       │
-   │                        (auto fallback)       │
-   │                                              │
-   │  Uni Info ─────────► Scraper (requests +     │
-   │                       BeautifulSoup)         │
-   │                    └──► FAISS vector index   │
-   │                         (local, on-disk)     │
-   │                                              │
-   │  PDF Q&A ──────────► pdfplumber extract      │
-   │                    └──► FAISS session index  │
-   │                         (in-memory)          │
-   │                                              │
-   │  Database ──────────► SQLite                 │
-   │                       (users, universities,  │
-   │                        credentials, pages)   │
-   └──────────────────────────────────────────────┘
-```
-
-### Onboarding Flow (new user)
-```
-/start
-  └─► "What's your university URL?"
-        └─► Auto-detect if login required
-              ├─► No login → start scraping in background
-              └─► Login needed → ask username → ask password (encrypted)
-                                  └─► scrape with credentials
-                                        └─► index complete → bot is ready
-```
-
----
-
-## Tech Stack
-
-| Component | Technology | Cost |
-|---|---|---|
-| Chat model | Groq API (Llama 3.3 70B) | Free |
-| Chat fallback | Google Gemini 2.0 Flash | Free |
-| Embeddings | sentence-transformers (all-MiniLM-L6-v2) | Free, local |
-| Vector search | FAISS | Free, local |
-| PDF extraction | pdfplumber | Free, local |
-| Web scraping | requests + BeautifulSoup | Free, local |
-| Database | SQLite | Free, local |
-| Encryption | cryptography (Fernet) | Free, local |
-
-**Total running cost: $0/month**
-
----
-
-## Project Structure
-
-```
-AcadBot/
-├── main.py                  # Bot entry point, all command & state handlers
-├── requirements.txt
-├── .env.example             # Template for environment variables
-├── .env                     # Your secrets (never committed)
-│
-├── function/
-│   ├── chat.py              # Groq + Gemini fallback chat model
-│   ├── rag.py               # RAG pipeline (embed → FAISS → query)
-│   ├── scraper.py           # Universal university website crawler
-│   ├── database.py          # SQLite schema and queries
-│   ├── res.py               # Resource finder (RAG → DB → static fallback)
-│   └── pdflinks.txt         # Static fallback resource links
-│
-├── data/
-│   ├── acadbot.db           # SQLite database (auto-created)
-│   └── vector_stores/       # FAISS indexes per university (auto-created)
-│       └── {uni_id}/
-│           ├── index.faiss
-│           └── chunks.pkl
-│
-└── website/                 # Companion website (hosted on Netlify)
-```
-
----
-
-## Getting Started
-
-### 1. Clone the repo
-```bash
-git clone https://github.com/AniketMishra23/AcadBot.git
-cd AcadBot
-```
-
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Set up environment variables
-
-Copy `.env.example` to `.env` and fill in your keys:
-
-```env
-BOT_TOKEN=your_telegram_bot_token
-
-GROQ_API_KEY=your_groq_api_key        # https://console.groq.com  (free)
-GEMINI_API_KEY=your_gemini_api_key    # https://aistudio.google.com (free)
-
-ENCRYPTION_KEY=your_fernet_key        # generate with the command below
-```
-
-Generate your `ENCRYPTION_KEY`:
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-### 4. Create a Telegram bot
-- Open [@BotFather](https://t.me/BotFather) on Telegram
-- Send `/newbot` and follow the prompts
-- Copy the token into `BOT_TOKEN` in your `.env`
-
-### 5. Run
-```bash
-python main.py
-```
 
 ---
 
@@ -160,9 +43,185 @@ python main.py
 
 ---
 
+## How It Works
+
+```
+Student (Telegram)
+       │
+       ▼
+   AcadBot (Railway)
+   ┌──────────────────────────────────────────────────────┐
+   │                                                      │
+   │  AI Chat ──────────► Groq (Llama 3.3 70B)            │
+   │                  └──► Gemini 2.0 Flash (fallback)    │
+   │                                                      │
+   │  Uni Info ─────────► Scraper (requests+BS4)          │
+   │                    └──► Qdrant Cloud (vectors)       │
+   │                                                      │
+   │  PDF Q&A ──────────► pdfplumber → FAISS (in-memory) │
+   │                                                      │
+   │  Database ──────────► PostgreSQL (Railway addon)     │
+   └──────────────────────────────────────────────────────┘
+```
+
+### Onboarding Flow
+
+```
+/start
+  └─► New user? → "What's your university URL?"
+        └─► Auto-detect login required
+              ├─► No  → scrape in background thread
+              └─► Yes → ask username → ask password (encrypted)
+                          └─► scrape with credentials
+                                └─► index in Qdrant → bot ready
+```
+
+---
+
+## Tech Stack
+
+| Component | Technology | Hosted At | Cost |
+|---|---|---|---|
+| Bot runner | Python + pyTelegramBotAPI | Railway | Free |
+| Chat model | Groq API (Llama 3.3 70B) | Groq Cloud | Free |
+| Chat fallback | Google Gemini 2.0 Flash | Google AI | Free |
+| Embeddings | sentence-transformers (all-MiniLM-L6-v2) | Railway (local) | Free |
+| Vector store | Qdrant | Qdrant Cloud | Free (1 GB) |
+| Database | PostgreSQL | Railway addon | Free |
+| PDF extraction | pdfplumber | Railway (local) | Free |
+| Web scraping | requests + BeautifulSoup | Railway (local) | Free |
+| Encryption | cryptography (Fernet) | Railway (local) | Free |
+
+**Total running cost: $0/month**
+
+---
+
+## Project Structure
+
+```
+AcadBot/
+├── main.py                  # Bot entry point — all commands, state machine, onboarding
+├── Procfile                 # Railway: tells it to run main.py as a worker
+├── railway.json             # Railway deploy config
+├── requirements.txt
+├── .env.example             # Template — copy to .env and fill in keys
+│
+├── function/
+│   ├── chat.py              # Groq + Gemini fallback, per-user history
+│   ├── rag.py               # Qdrant (university) + FAISS (PDF sessions)
+│   ├── scraper.py           # Universal university crawler + login handler
+│   ├── database.py          # PostgreSQL schema and queries
+│   ├── res.py               # Resource finder (RAG → DB → static fallback)
+│   └── pdflinks.txt         # Static fallback resource links
+│
+└── website/                 # Companion website (Netlify)
+```
+
+---
+
+## For Developers — Self-Hosting
+
+### 1. Prerequisites — create free accounts
+
+| Service | What it's for | Link |
+|---|---|---|
+| Telegram | Create a bot token | [@BotFather](https://t.me/BotFather) |
+| Railway | Host the bot + PostgreSQL | [railway.app](https://railway.app) |
+| Groq | Free LLM API | [console.groq.com](https://console.groq.com) |
+| Google AI Studio | Gemini fallback API | [aistudio.google.com](https://aistudio.google.com) |
+| Qdrant Cloud | Vector database | [cloud.qdrant.io](https://cloud.qdrant.io) |
+
+### 2. Clone the repo
+
+```bash
+git clone https://github.com/AniketMishra23/AcadBot.git
+cd AcadBot
+```
+
+### 3. Deploy to Railway
+
+**a) Connect repo**
+1. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub repo
+2. Select `AniketMishra23/AcadBot`
+
+**b) Add PostgreSQL**
+1. In your Railway project → Add Service → Database → PostgreSQL
+2. Railway automatically sets `DATABASE_URL` as an environment variable
+
+**c) Set environment variables**
+
+In Railway → your service → Variables, add:
+
+```
+BOT_TOKEN          = your telegram bot token
+GROQ_API_KEY       = from console.groq.com
+GEMINI_API_KEY     = from aistudio.google.com
+QDRANT_URL         = from Qdrant Cloud cluster console
+QDRANT_API_KEY     = from Qdrant Cloud cluster console
+ENCRYPTION_KEY     = generated below
+```
+
+Generate your `ENCRYPTION_KEY` (run once locally):
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+**d) Deploy**
+
+Railway auto-deploys on every push to `main`. The `Procfile` tells it to run `python main.py` as a background worker (not a web server — no port needed).
+
+---
+
+### Running Locally (development)
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env   # fill in your keys
+python main.py
+```
+
+For local PostgreSQL you can use [Neon](https://neon.tech) (free serverless Postgres) and paste the connection string as `DATABASE_URL`.
+
+---
+
+## How the RAG Pipeline Works
+
+```
+Scrape university pages
+        │
+        ▼
+  Extract text + PDF links per page
+        │
+        ▼
+  Split into 500-char chunks (80-char overlap)
+        │
+        ▼
+  Embed with all-MiniLM-L6-v2 (384-dim vectors)
+        │
+        ▼
+  Upsert into Qdrant Cloud  ←  filtered by uni_id
+        │
+  ┌─────┘  on student query
+  ▼
+  Embed the question
+        │
+        ▼
+  Top-5 nearest chunks from Qdrant (same uni_id)
+        │
+        ▼
+  Injected as context into LLM prompt
+        │
+        ▼
+  LLM answers, citing source page titles
+```
+
+PDF uploads use the same chunking and embedding, but stored in a per-user in-memory FAISS index (not Qdrant) — ephemeral, cleared when the user types `stop`.
+
+---
+
 ## Page Classification
 
-The scraper automatically classifies every page it crawls:
+The scraper automatically classifies every crawled page:
 
 | Type | Keywords detected |
 |---|---|
@@ -176,48 +235,12 @@ The scraper automatically classifies every page it crawls:
 
 ---
 
-## How the RAG Pipeline Works
-
-```
-Scrape university pages
-        │
-        ▼
-  Extract text + PDF links
-        │
-        ▼
-  Chunk into 500-char segments (80-char overlap)
-        │
-        ▼
-  Embed with all-MiniLM-L6-v2  (384-dim vectors)
-        │
-        ▼
-  Store in FAISS index  →  saved to data/vector_stores/{uni_id}/
-        │
-  ┌─────┘
-  │  On student query
-  ▼
-  Embed the question
-        │
-        ▼
-  Top-5 nearest chunks retrieved from FAISS
-        │
-        ▼
-  Injected as context into the LLM prompt
-        │
-        ▼
-  LLM answers citing the source pages
-```
-
-The same pipeline handles uploaded PDFs — just stored in a per-user in-memory index instead of on disk.
-
----
-
 ## Security
 
 - University passwords are **never stored in plain text**
-- Encrypted with [Fernet symmetric encryption](https://cryptography.io/en/latest/fernet/) before writing to SQLite
-- The `ENCRYPTION_KEY` in `.env` is required to decrypt — keep it safe
-- `.env` and `data/` are excluded from git via `.gitignore`
+- Encrypted with [Fernet symmetric encryption](https://cryptography.io/en/latest/fernet/) before writing to PostgreSQL
+- The `ENCRYPTION_KEY` in your environment is required to decrypt — never lose it
+- `.env` is excluded from git via `.gitignore`
 
 ---
 
@@ -227,13 +250,12 @@ The same pipeline handles uploaded PDFs — just stored in a per-user in-memory 
 - [ ] Scheduled re-scraping (auto-refresh university content daily)
 - [ ] Playwright support for JavaScript-heavy university portals
 - [ ] Multi-language support
-- [ ] Deployment guide (Railway / Render)
 
 ---
 
 ## Contributing
 
-Pull requests are welcome. For major changes, open an issue first.
+Pull requests are welcome. Open an issue first for major changes.
 
 ---
 
