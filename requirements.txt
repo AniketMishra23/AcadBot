@@ -1,6 +1,11 @@
-PYPDF2
-openai
 telebot
 python-dotenv
+groq
+google-generativeai
+sentence-transformers
 faiss-cpu
-tiktoken
+pdfplumber
+beautifulsoup4
+cryptography
+numpy
+requests
