@@ -18,6 +18,7 @@ Onboarding flow (new user)
 """
 
 import os
+import re
 import time
 import logging
 import threading
@@ -374,12 +375,14 @@ def handle_message(message):
     # ── Resource search ──────────────────────────────────────────────────────
     elif st == S_WAITING_RESOURCE:
         bot.send_chat_action(message.chat.id, "typing")
-        reply = findlink(text, _uni_id(uid))
+        reply, parse_mode = findlink(text, _uni_id(uid))
         try:
-            bot.reply_to(message, reply)   # plain text — no Markdown parser risk
+            bot.reply_to(message, reply, parse_mode=parse_mode)
         except Exception as e:
             logger.error(f"Resource reply failed uid={uid}: {e}")
-            bot.reply_to(message, "❌ Something went wrong fetching results. Try again.")
+            # Last-resort: strip all tags and send plain
+            plain = re.sub(r"<[^>]+>", "", reply)
+            bot.reply_to(message, plain)
         _set(uid, S_NONE)
 
     # ── PDF Q&A ──────────────────────────────────────────────────────────────
