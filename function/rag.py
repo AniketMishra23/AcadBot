@@ -170,27 +170,31 @@ def index_university_pages(uni_id: int, pages: list[dict]) -> int:
 
 
 def query_university(uni_id: int, question: str) -> str | None:
-    """Semantic search over the university's Qdrant index."""
+    """
+    Semantic search over the university's Qdrant index.
+    Fetches a wider result set and filters by uni_id in Python to avoid
+    server-side payload-filter reliability issues across qdrant-client versions.
+    """
     try:
         _ensure_collection()
-        client = _get_qdrant()
+        client  = _get_qdrant()
         query_vec = _get_model().encode([question], show_progress_bar=False)[0].tolist()
 
-        results = client.search(
+        # Fetch top-50 by vector similarity, then filter by uni_id locally
+        raw = client.search(
             collection_name=UNI_COLLECTION,
             query_vector=query_vec,
-            query_filter=qm.Filter(
-                must=[qm.FieldCondition(key="uni_id", match=qm.MatchValue(value=uni_id))]
-            ),
-            limit=TOP_K,
+            limit=50,
             with_payload=True,
         )
 
+        results = [r for r in raw if r.payload.get("uni_id") == uni_id][:TOP_K]
+
         if not results:
-            logger.info(f"Qdrant: no results for uni_id={uni_id}, question='{question[:60]}'")
+            logger.info(f"Qdrant: no results after local filter (uni_id={uni_id}, raw={len(raw)}), question='{question[:60]}'")
             return None
 
-        logger.info(f"Qdrant: {len(results)} results for uni_id={uni_id}")
+        logger.info(f"Qdrant: {len(results)} results for uni_id={uni_id} (raw={len(raw)})")
         hits = [r.payload for r in results]
         return _format_context(hits)
 
