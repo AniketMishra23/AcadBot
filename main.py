@@ -375,7 +375,11 @@ def handle_message(message):
     elif st == S_WAITING_RESOURCE:
         bot.send_chat_action(message.chat.id, "typing")
         reply = findlink(text, _uni_id(uid))
-        bot.reply_to(message, reply, parse_mode="Markdown")
+        try:
+            bot.reply_to(message, reply)   # plain text — no Markdown parser risk
+        except Exception as e:
+            logger.error(f"Resource reply failed uid={uid}: {e}")
+            bot.reply_to(message, "❌ Something went wrong fetching results. Try again.")
         _set(uid, S_NONE)
 
     # ── PDF Q&A ──────────────────────────────────────────────────────────────
