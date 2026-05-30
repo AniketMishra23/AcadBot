@@ -74,7 +74,7 @@ def _ensure_collection():
         client.create_payload_index(
             collection_name=UNI_COLLECTION,
             field_name="uni_id",
-            field_schema=qm.PayloadSchemaType.INTEGER,
+            field_schema="integer",
         )
         logger.info(f"Created Qdrant collection '{UNI_COLLECTION}'.")
 
@@ -121,14 +121,15 @@ def index_university_pages(uni_id: int, pages: list[dict]) -> int:
     client = _get_qdrant()
 
     # Remove stale vectors for this university before re-indexing
-    client.delete(
-        collection_name=UNI_COLLECTION,
-        points_selector=qm.FilterSelector(
-            filter=qm.Filter(
+    try:
+        client.delete(
+            collection_name=UNI_COLLECTION,
+            points_selector=qm.Filter(
                 must=[qm.FieldCondition(key="uni_id", match=qm.MatchValue(value=uni_id))]
-            )
-        ),
-    )
+            ),
+        )
+    except Exception as e:
+        logger.warning(f"Could not delete old vectors for uni_id={uni_id}: {e}")
 
     texts, payloads = [], []
     for page in pages:
@@ -180,13 +181,15 @@ def query_university(uni_id: int, question: str) -> str | None:
         client  = _get_qdrant()
         query_vec = _get_model().encode([question], show_progress_bar=False)[0].tolist()
 
-        # Fetch top-50 by vector similarity, then filter by uni_id locally
-        raw = client.search(
+        # Fetch top-50 by vector similarity, then filter by uni_id locally.
+        # query_points() is the current API (qdrant-client >= 1.7).
+        response = client.query_points(
             collection_name=UNI_COLLECTION,
-            query_vector=query_vec,
+            query=query_vec,
             limit=50,
             with_payload=True,
         )
+        raw = response.points
 
         results = [r for r in raw if r.payload.get("uni_id") == uni_id][:TOP_K]
 
