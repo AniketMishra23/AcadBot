@@ -198,8 +198,46 @@ def cmd_help(message):
         "/pdf\\_qna — upload a PDF and ask questions about it\n"
         "/setup    — change or re-index your university\n"
         "/clear    — clear chat history & PDF session\n"
+        "/debug    — check connection status\n"
         "/help     — this message",
         parse_mode="Markdown")
+
+
+@bot.message_handler(commands=["debug"])
+def cmd_debug(message):
+    uid  = message.from_user.id
+    lines = ["🔧 *AcadBot Debug*\n"]
+
+    # 1. User record
+    user = get_user(uid)
+    if not user:
+        lines.append("❌ User not found in database — run /start")
+        bot.reply_to(message, "\n".join(lines), parse_mode="Markdown")
+        return
+    lines.append(f"✅ User in DB  (onboarded={user['onboarded']}, uni\\_id={user['university_id']})")
+
+    # 2. University link
+    uni_id = user["university_id"]
+    if not uni_id:
+        lines.append("❌ No university linked — run /setup")
+        bot.reply_to(message, "\n".join(lines), parse_mode="Markdown")
+        return
+    uni = get_university(uni_id)
+    lines.append(f"✅ University: {uni['name'] or uni['url']}")
+
+    # 3. DB scraped pages
+    from function.database import search_pages
+    rows = search_pages(uni_id, "event", limit=1)
+    lines.append(f"{'✅' if rows else '❌'} DB pages: {'found' if rows else 'empty (re-run /setup)'}")
+
+    # 4. Qdrant
+    try:
+        ctx = rag.query_university(uni_id, "event")
+        lines.append(f"{'✅' if ctx else '⚠️'} Qdrant: {'returning context' if ctx else 'no results (may need /setup)'}")
+    except Exception as e:
+        lines.append(f"❌ Qdrant error: {e}")
+
+    bot.reply_to(message, "\n".join(lines), parse_mode="Markdown")
 
 
 @bot.message_handler(commands=["resource"])
