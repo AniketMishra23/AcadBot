@@ -402,7 +402,7 @@ from urllib.parse import urlparse   # noqa: E402 (used in _scrape_in_background)
 logger.info("AcadBot starting...")
 while True:
     try:
-        bot.polling(non_stop=True, interval=0, timeout=30, allowed_updates=[], drop_pending_updates=True)
+        bot.polling(non_stop=True, interval=0, timeout=30)
     except Exception as e:
         logger.error(f"Polling error: {e} — restarting in 5 s...")
         time.sleep(5)
