@@ -33,7 +33,7 @@ def _conn():
     # Normalize older 'postgres://' prefix that some platforms still emit
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
-    conn = psycopg2.connect(url)
+    conn = psycopg2.connect(url, connect_timeout=10)
     conn.cursor_factory = psycopg2.extras.RealDictCursor
     return conn
 

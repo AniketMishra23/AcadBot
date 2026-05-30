@@ -51,7 +51,18 @@ logger = logging.getLogger(__name__)
 dotenv.load_dotenv()
 init_db()
 
-bot       = telebot.TeleBot(os.getenv("BOT_TOKEN"))
+bot = telebot.TeleBot(os.getenv("BOT_TOKEN"))
+
+# Pre-warm the embedding model in background so the first query isn't slow
+def _prewarm():
+    try:
+        from function.rag import _get_model
+        _get_model()
+        logger.info("Embedding model pre-warmed.")
+    except Exception as e:
+        logger.warning(f"Model pre-warm failed: {e}")
+
+threading.Thread(target=_prewarm, daemon=True).start()
 
 # ─── Encryption ───────────────────────────────────────────────────────────────
 
