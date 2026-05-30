@@ -49,9 +49,12 @@ def chatmodel(user_id: int, prompt: str, context: str | None = None) -> str:
     # Build the actual message sent to the LLM
     if context:
         user_msg = (
-            f"Context from the university website:\n{context}\n\n"
-            f"Student question: {prompt}\n\n"
-            "Answer using the context if relevant; otherwise use your general knowledge."
+            f"The following content was retrieved from the student's university website. "
+            f"You MUST use this to answer the question. "
+            f"Do NOT say you lack access to university data — it is provided below.\n\n"
+            f"--- UNIVERSITY WEBSITE CONTENT ---\n{context}\n"
+            f"--- END OF CONTENT ---\n\n"
+            f"Student question: {prompt}"
         )
     else:
         user_msg = prompt

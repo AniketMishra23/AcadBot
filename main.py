@@ -364,12 +364,29 @@ def handle_message(message):
     else:
         bot.send_chat_action(message.chat.id, "typing")
         try:
-            # Enrich with university context if available
             context = None
             uid_uni = _uni_id(uid)
+
             if uid_uni:
+                # 1. Semantic search via Qdrant
                 context = rag.query_university(uid_uni, text)
 
+                # 2. Fallback: keyword search in PostgreSQL if Qdrant returned nothing
+                if not context:
+                    from function.database import search_pages
+                    rows = search_pages(uid_uni, text, limit=3)
+                    if rows:
+                        parts = []
+                        for r in rows:
+                            parts.append(
+                                f"[{r['title']}] ({r['page_type']})\n"
+                                f"{r['content'][:400]}\n"
+                                f"Source: {r['url']}"
+                            )
+                        context = "\n\n---\n\n".join(parts)
+                        logger.info(f"DB keyword fallback returned {len(rows)} rows for uid={uid}")
+
+            logger.info(f"Context for uid={uid}: {'found' if context else 'none'}")
             reply = chatmodel(uid, text, context=context)
             bot.reply_to(message, reply)
         except Exception as e:

@@ -187,13 +187,15 @@ def query_university(uni_id: int, question: str) -> str | None:
         )
 
         if not results:
+            logger.info(f"Qdrant: no results for uni_id={uni_id}, question='{question[:60]}'")
             return None
 
+        logger.info(f"Qdrant: {len(results)} results for uni_id={uni_id}")
         hits = [r.payload for r in results]
         return _format_context(hits)
 
     except Exception as e:
-        logger.warning(f"Qdrant query failed: {e}")
+        logger.error(f"Qdrant query FAILED (uni_id={uni_id}): {type(e).__name__}: {e}")
         return None
 
 
